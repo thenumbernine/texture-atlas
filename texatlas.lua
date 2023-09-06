@@ -74,7 +74,6 @@ local function writeImages()
 			infos:mapi(function(info)
 				if not info.rect then return nil end
 				return {
-					filename=info.fn,
 					pos={
 						info.rect.min.x + padding,
 						info.rect.min.y + padding,
@@ -83,7 +82,7 @@ local function writeImages()
 						info.img.width,
 						info.img.height
 					},
-				}
+				}, info.fn
 			end):setmetatable(nil)
 		)
 	)
