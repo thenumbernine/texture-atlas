@@ -26,20 +26,29 @@ end)
 for _,fn in ipairs(fns) do
 	print(fn)
 	local img = Image(fn)
-	infos:insert{fn=fn, img=img}
+	infos:insert{fn=tostring(path(fn)), img=img}
 	totalPixels = totalPixels + img.width * img.height
 end
 infos:sort(function(a,b)
 	-- sort by min width?
+	--return a.img.width < b.img.width
+	-- sort by min height?
+	return a.img.height < b.img.height
 	-- sort by min volume?
-	return a.img.width * a.img.height < b.img.width * b.img.height
+	--return a.img.width * a.img.height < b.img.width * b.img.height
 end)
 print('total pixels', totalPixels)
 local sqrtTotalPixels = math.ceil(math.sqrt(totalPixels))
 print('sqrt total pixels', sqrtTotalPixels)
-local texwidth = math.ceil(sqrtTotalPixels * 1.49)
-print('round up by a bit', texwidth)
-local atlasSize = vec2i(texwidth, texwidth)
+
+local function rupow2(x)
+	return 2^math.ceil(math.log(x,2))
+end
+local texwidth = rupow2(sqrtTotalPixels)
+--local texheight = rupow2(totalPixels/texwidth)	-- this allows for height<width, but meh that's filling up so ...
+local texheight = texwidth
+print('round up by a bit', texwidth, texheight)
+local atlasSize = vec2i(texwidth, texheight)
 local atlasRect = box2i(vec2i(0,0), atlasSize-1)
 
 local function writeImages()
@@ -64,7 +73,17 @@ local function writeImages()
 		tolua(
 			infos:mapi(function(info)
 				if not info.rect then return nil end
-				return info.rect:toTable()
+				return {
+					filename=info.fn,
+					pos={
+						info.rect.min.x + padding,
+						info.rect.min.y + padding,
+					},
+					size={
+						info.img.width,
+						info.img.height
+					},
+				}
 			end):setmetatable(nil)
 		)
 	)
@@ -104,13 +123,19 @@ local function calcRects()
 			if not touchesAny(newrect) then
 				break
 			end
---print('testing at', pos)			
+--print('testing at', pos)
 			pos.x = pos.x + imgsize.x
 			if pos.x + imgsize.x >= atlasSize.x then
 				pos.x = 0
-				pos.y = pos.y + imgsize.y
+
+				pos.y = 0
+				for _,info2 in ipairs(infos) do
+					if info2.rect then
+						pos.y = math.max(pos.y, info2.rect.max.y+1)
+					end
+				end
 				if pos.y + imgsize.y >= atlasSize.y then
-					
+
 					writeImages()
 
 					error("filled up")
@@ -118,7 +143,7 @@ local function calcRects()
 			end
 		end
 		info.rect = newrect
-		print('inserting', info.fn, 'at', info.rect)
+--		print('inserting', info.fn, 'at', info.rect)
 		pos.x = pos.x + imgsize.x
 	end
 
