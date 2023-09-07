@@ -8,15 +8,17 @@ local tolua = require 'ext.tolua'
 local vec2i = require 'vec-ffi.vec2i'
 local box2i = require 'vec-ffi.box2i'
 local Image = require 'image'
+local cmdline = require 'ext.cmdline'(...)
 
-local srcdir, padding = ...
-assert(srcdir, "expected srcdir")
-if type(padding) == 'string' then
-	padding = assert(tonumber(padding), "failed to read padding")
-else
-	padding = 1
-end
-local srcdir = path(srcdir)
+local srcdir = path(assert(cmdline.srcdir, "expected srcdir=..."))
+
+local padding = cmdline.padding
+	and assert(tonumber(cmdline.padding), "failed to determine padding from "..tolua(cmdline.padding))
+	or 1
+
+-- this is optionally a set of prefixes for which whatever files prefix matches this, those files are tiled with a 1px border instead of padded.
+local borderTiled = table(cmdline.borderTiled) --:mapi(function(v) return true, v end):setmetatable(nil)
+
 local infos = table()
 local totalPixels = 0
 local fns = srcdir:rdir():filter(function(fn)
@@ -59,25 +61,25 @@ local function writeImages()
 	for _,info in ipairs(infos) do
 		if info.rect then
 			print('writing', info.fn, 'at', info.rect.min)
-			--[[ don't just paste ...
-			atlasImg:pasteInto{
-				image = info.img,
-				x = info.rect.min.x + padding,
-				y = info.rect.min.y + padding,
-			}
-			-- ]]
-			-- [[ paste-with-border
-			atlasImg:pasteInto{
-				-- TODO choose tile vs :paste{img=info.img, x=padding, y=padding} to give it a fully transparent border.
-				image = info.img:tile(
-					info.img.width+2*padding,
-					info.img.height+2*padding,
-					padding,
-					padding),
-				x = info.rect.min.x + padding,
-				y = info.rect.min.y + padding,
-			}
-			--]]
+			if borderTiled:find(nil, function(prefix) return info.fn:sub(1,#prefix) == prefix end) then
+				-- padding is wrapped
+				atlasImg:pasteInto{
+					image = info.img:tile(
+						info.img.width+2*padding,
+						info.img.height+2*padding,
+						padding,
+						padding),
+					x = info.rect.min.x,
+					y = info.rect.min.y,
+				}
+			else
+				-- padding is transparent
+				atlasImg:pasteInto{
+					image = info.img,
+					x = info.rect.min.x + padding,
+					y = info.rect.min.y + padding,
+				}
+			end
 			wrote = wrote + 1
 		else
 			failed = failed + 1
