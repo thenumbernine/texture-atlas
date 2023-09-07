@@ -26,6 +26,7 @@ end)
 for _,fn in ipairs(fns) do
 	print(fn)
 	local img = Image(fn)
+		:setChannels(4)
 	infos:insert{fn=tostring(path(fn)), img=img}
 	totalPixels = totalPixels + img.width * img.height
 end
