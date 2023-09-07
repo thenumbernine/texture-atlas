@@ -58,11 +58,25 @@ local function writeImages()
 	for _,info in ipairs(infos) do
 		if info.rect then
 			print('writing', info.fn, 'at', info.rect.min)
+			--[[ don't just paste ...
 			atlasImg:pasteInto{
 				image = info.img,
 				x = info.rect.min.x + padding,
-				y = info.rect.min.y + padding
+				y = info.rect.min.y + padding,
 			}
+			-- ]]
+			-- [[ paste-with-border
+			atlasImg:pasteInto{
+				-- TODO choose tile vs :paste{img=info.img, x=padding, y=padding} to give it a fully transparent border.
+				image = info.img:tile(
+					info.img.width+2*padding,
+					info.img.height+2*padding,
+					padding,
+					padding),
+				x = info.rect.min.x + padding,
+				y = info.rect.min.y + padding,
+			}
+			--]]
 			wrote = wrote + 1
 		else
 			failed = failed + 1
