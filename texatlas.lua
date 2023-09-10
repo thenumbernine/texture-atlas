@@ -1,6 +1,11 @@
 #!/usr/bin/env luajit
 --[[
 build a texture atlas from a directory of images
+cmdline:
+	srcdir =
+	size =
+	padding =
+	borderTiled =
 --]]
 local path = require 'ext.path'
 local table = require 'ext.table'
@@ -47,123 +52,140 @@ print('sqrt total pixels', sqrtTotalPixels)
 local function rupow2(x)
 	return 2^math.ceil(math.log(x,2))
 end
-local texwidth = rupow2(sqrtTotalPixels)
---local texheight = rupow2(totalPixels/texwidth)	-- this allows for height<width, but meh that's filling up so ...
-local texheight = texwidth
-print('round up by a bit', texwidth, texheight)
-local atlasSize = vec2i(texwidth, texheight)
-local atlasRect = box2i(vec2i(0,0), atlasSize-1)
 
-local function writeImages()
-	local atlasImg = Image(atlasSize.x, atlasSize.y, 4, 'unsigned char'):clear()
-	local wrote = 0
-	local failed = 0
-	for _,info in ipairs(infos) do
-		if info.rect then
-			print('writing', info.fn, 'at', info.rect.min)
-			if borderTiled:find(nil, function(prefix) return info.fn:sub(1,#prefix) == prefix end) then
-				-- padding is wrapped
-				atlasImg:pasteInto{
-					image = info.img:tile(
-						info.img.width+2*padding,
-						info.img.height+2*padding,
-						padding,
-						padding),
-					x = info.rect.min.x,
-					y = info.rect.min.y,
-				}
-			else
-				-- padding is transparent
-				atlasImg:pasteInto{
-					image = info.img,
-					x = info.rect.min.x + padding,
-					y = info.rect.min.y + padding,
-				}
-			end
-			wrote = wrote + 1
-		else
-			failed = failed + 1
-		end
-	end
-	atlasImg:save'atlas.png'
-	path'atlas.lua':write(
-		tolua(
-			infos:mapi(function(info)
-				if not info.rect then return nil end
-				return {
-					pos={
-						info.rect.min.x + padding,
-						info.rect.min.y + padding,
-					},
-					size={
-						info.img.width,
-						info.img.height
-					},
-				}, info.fn
-			end):setmetatable(nil)
-		)
-	)
-	print("wrote "..wrote.." images")
-	print("failed to write "..failed.." images")
+local atlasSize
+if cmdline.size then
+	atlasSize = vec2i(table.unpack(cmdline.size))
+else
+	local texwidth = rupow2(sqrtTotalPixels)
+	--local texheight = rupow2(totalPixels/texwidth)	-- this allows for height<width, but meh that's filling up so ...
+	local texheight = texwidth
+	print('round up by a bit', texwidth, texheight)
+	atlasSize = vec2i(texwidth, texheight)
 end
 
-local function touchesAny(rect)
-	if not atlasRect:contains(rect) then
-		print("failed by "..rect.." being outside "..atlasRect)
-		return true
+while true do
+	print("trying with size " ..atlasSize)
+	local atlasRect = box2i(vec2i(0,0), atlasSize-1)
+	local filledup
+
+	local function writeImages()
+		local atlasImg = Image(atlasSize.x, atlasSize.y, 4, 'unsigned char'):clear()
+		local wrote = 0
+		local failed = 0
+		for _,info in ipairs(infos) do
+			if info.rect then
+				print('writing', info.fn, 'at', info.rect.min)
+				if borderTiled:find(nil, function(prefix) return info.fn:sub(1,#prefix) == prefix end) then
+					-- padding is wrapped
+					atlasImg:pasteInto{
+						image = info.img:tile(
+							info.img.width+2*padding,
+							info.img.height+2*padding,
+							padding,
+							padding),
+						x = info.rect.min.x,
+						y = info.rect.min.y,
+					}
+				else
+					-- padding is transparent
+					atlasImg:pasteInto{
+						image = info.img,
+						x = info.rect.min.x + padding,
+						y = info.rect.min.y + padding,
+					}
+				end
+				wrote = wrote + 1
+			else
+				failed = failed + 1
+			end
+		end
+		atlasImg:save'atlas.png'
+		path'atlas.lua':write(
+			tolua(
+				infos:mapi(function(info)
+					if not info.rect then return nil end
+					return {
+						pos={
+							info.rect.min.x + padding,
+							info.rect.min.y + padding,
+						},
+						size={
+							info.img.width,
+							info.img.height
+						},
+					}, info.fn
+				end):setmetatable(nil)
+			)
+		)
+		print("wrote "..wrote.." images")
+		print("failed to write "..failed.." images")
 	end
-	for _,info in ipairs(infos) do
-		if info.rect
-		and info.rect:touches(rect) then
-			print("failed by "..rect.." touching "..info.rect)
+
+	local function touchesAny(rect)
+		if not atlasRect:contains(rect) then
+			print("failed by "..rect.." being outside "..atlasRect)
 			return true
 		end
-	end
-end
-
-local function calcRects()
-	-- clear rects
-	for _,info in ipairs(infos) do
-		info.rect = nil
-	end
-	local pos = vec2i(0,0)
-	for _,info in ipairs(infos) do
-		local img = info.img
-		local imgsize = vec2i(img.width, img.height) + 2 * padding
-		local newrect
-		while true do
-			newrect = box2i(
-				pos,
-				pos + imgsize - 1)	-- [incl,incl]
---print("testing touch of "..newrect)
-			if not touchesAny(newrect) then
-				break
-			end
---print('testing at', pos)
-			pos.x = pos.x + imgsize.x
-			if pos.x + imgsize.x >= atlasSize.x then
-				pos.x = 0
-
-				pos.y = 0
-				for _,info2 in ipairs(infos) do
-					if info2.rect then
-						pos.y = math.max(pos.y, info2.rect.max.y+1)
-					end
-				end
-				if pos.y + imgsize.y >= atlasSize.y then
-
-					writeImages()
-
-					error("filled up")
-				end
+		for _,info in ipairs(infos) do
+			if info.rect
+			and info.rect:touches(rect) then
+				print("failed by "..rect.." touching "..info.rect)
+				return true
 			end
 		end
-		info.rect = newrect
---		print('inserting', info.fn, 'at', info.rect)
-		pos.x = pos.x + imgsize.x
 	end
 
-	writeImages()
-end
+	local function calcRects()
+		-- clear all rects
+		for _,info in ipairs(infos) do
+			info.rect = nil
+		end
+		local pos = vec2i(0,0)
+		for _,info in ipairs(infos) do
+			local img = info.img
+			local imgsize = vec2i(img.width, img.height) + 2 * padding
+			local newrect
+			while true do
+				newrect = box2i(
+					pos,
+					pos + imgsize - 1)	-- [incl,incl]
+	--print("testing touch of "..newrect)
+				if not touchesAny(newrect) then
+					break
+				end
+	--print('testing at', pos)
+				pos.x = pos.x + imgsize.x
+				if pos.x + imgsize.x >= atlasSize.x then
+					pos.x = 0
 
-calcRects()
+					pos.y = 0
+					for _,info2 in ipairs(infos) do
+						if info2.rect then
+							pos.y = math.max(pos.y, info2.rect.max.y+1)
+						end
+					end
+					if pos.y + imgsize.y >= atlasSize.y then
+						filledup = true
+						return
+					end
+				end
+			end
+			info.rect = newrect
+	--		print('inserting', info.fn, 'at', info.rect)
+			pos.x = pos.x + imgsize.x
+		end
+
+		writeImages()
+	end
+
+	filledup = false
+	calcRects()
+	if not filledup then break end
+	if atlasSize.x > atlasSize.y then
+		atlasSize.y = atlasSize.y * 2
+	else
+		atlasSize.x = atlasSize.x * 2
+	end
+	print("filled up ...")
+end
