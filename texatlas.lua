@@ -26,11 +26,10 @@ local borderTiled = table(cmdline.borderTiled) --:mapi(function(v) return true, 
 
 local infos = table()
 local totalPixels = 0
-local fns = srcdir:rdir():filter(function(fn)
+for fn in srcdir:rdir():filter(function(fn)
 	local srcpath = path(fn)
 	return select(2, srcpath:getext()) == 'png'
-end)
-for _,fn in ipairs(fns) do
+end) do
 	print(fn)
 	local img = Image(fn)
 		:setChannels(4)
