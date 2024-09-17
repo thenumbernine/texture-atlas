@@ -1,11 +1,6 @@
 #!/usr/bin/env luajit
 --[[
 build a texture atlas from a directory of images
-cmdline:
-	srcdir =
-	size =
-	padding =
-	borderTiled =
 --]]
 local path = require 'ext.path'
 local table = require 'ext.table'
@@ -13,7 +8,13 @@ local tolua = require 'ext.tolua'
 local vec2i = require 'vec-ffi.vec2i'
 local box2i = require 'vec-ffi.box2i'
 local Image = require 'image'
-local cmdline = require 'ext.cmdline'(...)
+local cmdline = require 'ext.cmdline'.validate{
+	srcdir = {desc='Where to read files from.'},
+	size = {desc='(optional) What texture atlas size to first attempt.  Size is automatic and will keep doubling until a size that fits all textures is found.'},
+	padding = {desc='(optional) What border to use between subimages.  Default is 1.'},
+	borderTiled = {desc="(optional) A string-prefix to match to filenames, files that match this will have their pixels copied into the 'padding' area such that the image will blend tiled instead of to a border."},
+	resample = {desc='(optional) Whether to resample all images to a specific size before adding them.'},
+}(...)
 
 local srcdir = path(assert(cmdline.srcdir, "expected srcdir=..."))
 
@@ -24,17 +25,34 @@ local padding = cmdline.padding
 -- this is optionally a set of prefixes for which whatever files prefix matches this, those files are tiled with a 1px border instead of padded.
 local borderTiled = table(cmdline.borderTiled) --:mapi(function(v) return true, v end):setmetatable(nil)
 
+local resample
+if cmdline.resample then
+	resample = vec2i(table.unpack(cmdline.resample))
+end
+
 local infos = table()
 local totalPixels = 0
-for fn in srcdir:rdir() do
-	if select(2, fn:getext()) == 'png' then
-		print(fn)
-		local img = Image(fn.path):setChannels(4)
-		infos:insert{fn=fn.path, img=img}
-		totalPixels = totalPixels + img.width * img.height
+table.wrapfor(srcdir:rdir())
+:mapi(function(vs)
+	return vs[1]
+end)
+:filter(function(fn)
+	return select(2, fn:getext()) == 'png'
+end)
+:sort(function(a,b) return a.path < b.path end)
+:mapi(function(fn)
+	print(fn)
+	local img = Image(fn.path):setChannels(4)
+	if resample then	-- TODO pattern match, same as borderTiled
+		img = img:resize(resample:unpack())
 	end
-end
+	infos:insert{fn=fn.path, img=img}
+	totalPixels = totalPixels + img.width * img.height
+end)
 infos:sort(function(a,b)
+	if a.img.height == b.img.height then
+		return a.fn < b.fn
+	end
 	-- sort by min width?
 	--return a.img.width < b.img.width
 	-- sort by min height?
