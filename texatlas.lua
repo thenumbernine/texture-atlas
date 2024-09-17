@@ -26,15 +26,13 @@ local borderTiled = table(cmdline.borderTiled) --:mapi(function(v) return true, 
 
 local infos = table()
 local totalPixels = 0
-for fn in srcdir:rdir():filter(function(fn)
-	local srcpath = path(fn)
-	return select(2, srcpath:getext()) == 'png'
-end) do
-	print(fn)
-	local img = Image(fn)
-		:setChannels(4)
-	infos:insert{fn=tostring(path(fn)), img=img}
-	totalPixels = totalPixels + img.width * img.height
+for fn in srcdir:rdir() do
+	if select(2, fn:getext()) == 'png' then
+		print(fn)
+		local img = Image(fn.path):setChannels(4)
+		infos:insert{fn=fn.path, img=img}
+		totalPixels = totalPixels + img.width * img.height
+	end
 end
 infos:sort(function(a,b)
 	-- sort by min width?
