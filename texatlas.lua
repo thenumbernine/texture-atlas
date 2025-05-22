@@ -42,7 +42,9 @@ end)
 :sort(function(a,b) return a.path < b.path end)
 :mapi(function(fn)
 	print(fn)
-	local img = Image(fn.path):setChannels(4)
+	local img = Image(fn.path)
+	print(fn, 'src channels', img.channels)
+	img = img:rgba()
 	if resample then	-- TODO pattern match, same as borderTiled
 		img = img:resize(resample:unpack())
 	end

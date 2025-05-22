@@ -1,0 +1,10 @@
+name = "texture-atlas"
+files = {
+	["README.md"] = "texture-atlas/README.md",
+	["texatlas.lua"] = "texture-atlas/texatlas.lua",
+}
+deps = {
+	"ext",
+	"image",
+	"vec-ffi",
+}
