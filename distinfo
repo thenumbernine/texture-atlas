@@ -1,7 +1,12 @@
-name = "texture-atlas"
+--------------------------------------------
+-- generated with dist/build-distinfo.rua --
+--------------------------------------------
+
+name = "texatlas"
 files = {
-	["README.md"] = "texture-atlas/README.md",
-	["texatlas.lua"] = "texture-atlas/texatlas.lua",
+	"README.md",
+	"distinfo",
+	"texatlas.lua",
 }
 deps = {
 	"ext",
