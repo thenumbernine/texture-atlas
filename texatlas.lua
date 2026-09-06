@@ -36,7 +36,7 @@ table.wrapfor(srcdir:rdir())
 :mapi(function(vs)
 	return vs[1]
 end)
-:filter(function(fn)
+:filteri(function(fn)
 	return select(2, fn:getext()) == 'png'
 end)
 :sort(function(a,b) return a.path < b.path end)
